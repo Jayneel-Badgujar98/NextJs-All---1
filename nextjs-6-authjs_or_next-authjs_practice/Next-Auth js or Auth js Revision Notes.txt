@@ -1,0 +1,254 @@
+**🔐 NextAuth.js & Authentication in Next.js - Revision Notes**
+
+---
+
+### ✅ 1. Authentication vs Authorization
+
+* **Authentication**: Are you logged in?
+* **Authorization**: Are you allowed to access a specific page? (e.g., admin-only pages)
+
+---
+
+### ✅ 2. File Structure (App Router)
+
+```
+/app
+  /login/page.js          - Public sign-in page
+  /dashboard/page.js      - Authenticated users only
+  /admin/page.js          - Admin-only route
+  /unauthorized/page.js   - For blocked access
+/api/auth/[...nextauth]/route.js - Main NextAuth config
+/middleware.js            - Protect routes based on session
+```
+
+---
+
+### ✅ 3. NextAuth Setup (route.js)
+
+```js
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { connectDB } from "@/lib/db";
+import User from "@/models/User";
+import bcrypt from "bcryptjs";
+
+export const authOptions = {
+  providers: [
+    CredentialsProvider({
+      async authorize(credentials) {
+        await connectDB();
+        const user = await User.findOne({ email: credentials.email });
+        if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
+          throw new Error("Invalid email or password");
+        }
+        return user;
+      }
+    })
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) token.role = user.role;
+      return token;
+    },
+    async session({ session, token }) {
+      session.user.role = token.role;
+      return session;
+    }
+  },
+  session: {
+    strategy: "jwt"
+  },
+  secret: process.env.NEXTAUTH_SECRET
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
+```
+
+---
+
+### ✅ 4. Client-side Protection (app/dashboard/page.js)
+
+```js
+"use client";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function DashboardPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status]);
+
+  if (status === "loading") return <p>Loading...</p>;
+  return <div>Welcome {session?.user?.email}</div>;
+}
+```
+
+---
+
+### ✅ 5. Server-side Protection (app/dashboard/page.js)
+
+```js
+import { getServerSession } from "next-auth";
+import { authOptions } from "../api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login");
+
+  return <div>Welcome {session?.user?.email}</div>;
+}
+```
+
+---
+
+### ✅ 6. middleware.js for Route Protection
+
+```js
+import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
+
+export async function middleware(request) {
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const isAuth = !!token;
+  const { pathname } = request.nextUrl;
+
+  if (
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico"
+  ) return NextResponse.next();
+
+  if (!isAuth && pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (pathname.startsWith("/admin") && token?.role !== "admin") {
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/dashboard/:path*", "/admin/:path*"]
+};
+```
+
+---
+
+### ✅ 7. Sign In & Sign Out Buttons (client components)
+
+```js
+import { signIn, signOut } from "next-auth/react";
+
+<button onClick={() => signIn()}>Sign In</button>
+<button onClick={() => signOut({ callbackUrl: "/" })}>Sign Out</button>
+```
+
+---
+
+### ✅ 8. Hashing Passwords with bcrypt (in signup handler or model)
+
+```js
+import bcrypt from "bcryptjs";
+
+export async function hashPassword(password) {
+  const salt = await bcrypt.genSalt(10);
+  return await bcrypt.hash(password, salt);
+}
+
+// Usage:
+const hashedPassword = await hashPassword(userInputPassword);
+```
+
+---
+
+### ✅ 9. Connecting MongoDB using Prisma
+
+1. Setup Prisma:
+
+```bash
+npx prisma init
+```
+
+2. Edit `.env`:
+
+```
+DATABASE_URL="mongodb+srv://<user>:<password>@cluster.mongodb.net/mydb"
+```
+
+3. Define Schema (`/prisma/schema.prisma`):
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String @id @default(auto()) @map("_id") @test.ObjectId
+  email    String @unique
+  password String
+  role     String?
+}
+```
+
+4. Push to DB and Generate Client:
+
+```bash
+npx prisma db push
+npx prisma generate
+```
+
+5. Use Prisma Client:
+
+```js
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+const user = await prisma.user.findUnique({ where: { email: "test@example.com" } });
+```
+
+---
+
+### 🧠 Always Remember:
+
+✅ 8. Useful Tips
+
+getToken() gives JWT payload (works only in middleware or server context)
+
+use !!token to convert session to boolean value like true or false 
+
+Use !!token to check if user is authenticated 
+
+pathname tells which route is being accessed
+
+redirect() in middleware is for server-side security
+
+Restrict UI on client side based on session.user.role
+
+-------------------------------------------------------------------
+
+* Use **client component** if you need live session updates.
+* Use **server component** for secure, fast page rendering.
+* Use **middleware** to block unauthorized access before rendering.
+* Hash passwords before saving to DB (e.g., `bcrypt.hash()`)
+* Never expose passwords or secret tokens in the frontend.
+* `signIn()` uses `redirect: true/false`, `callbackUrl` and can be combined with router.push.
+* Use `res?.error` to handle incorrect login attempts.
+* Protect routes on both frontend and backend for full security.
+
+---
+
+You're now 100% ready to implement and revise `NextAuth.js` anytime!
