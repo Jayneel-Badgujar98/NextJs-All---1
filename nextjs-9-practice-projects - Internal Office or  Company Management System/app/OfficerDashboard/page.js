@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { ChatSidebar } from "../ChatSidebar/page";
 
 // Table styling constants
 const TABLE_HEADER_CLASSES = "px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider";
@@ -7,6 +8,7 @@ const TABLE_CELL_CLASSES = "px-6 py-4 whitespace-nowrap text-sm text-gray-200";
 const TABLE_ROW_CLASSES = "hover:bg-gray-800 transition cursor-pointer";
 
 const OfficerDashboard = () => {
+  const [chatOpen, setChatOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState("");
@@ -34,9 +36,49 @@ const OfficerDashboard = () => {
   const [assignSuccess, setAssignSuccess] = useState("");
   const assignTextRef = useRef(null);
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTasks, setHistoryTasks] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   // Officer's name from localStorage
-  const name = typeof window !== "undefined" ? localStorage.getItem("name") : "";
-  const email = localStorage.getItem("email");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedName = localStorage.getItem("name");
+      const storedEmail = localStorage.getItem("email");
+      setName(storedName || "");
+      setEmail(storedEmail || "");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (email) {
+      fetchAll();
+    }
+  }, [email]);
+
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const res = await fetch("/api/getAssignedTasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendedByName: name }), // name from localStorage
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setHistoryTasks(data.tasks || []);
+      } else {
+        setHistoryError(data.error || "Failed to load history.");
+      }
+    } catch {
+      setHistoryError("Failed to load history.");
+    }
+    setHistoryLoading(false);
+  };
 
   // Fetch employees and officer's tasks
   const fetchAll = async () => {
@@ -174,7 +216,7 @@ const OfficerDashboard = () => {
 
   // Render Employee Table (no promote/demote, only delete and assign task)
   const renderEmployeeTable = (users) => (
-    <div className="bg-[#18181b] rounded-xl shadow border border-gray-800 mb-8 relative">
+    <div className="bg-[#18181b] rounded-xl shadow border border-gray-800 mb-8 relative overflow-auto">
       <table className="min-w-full divide-y divide-gray-700">
         <thead>
           <tr>
@@ -215,7 +257,7 @@ const OfficerDashboard = () => {
                     </svg>
                   </button>
                   {menuOpen[user.id] && (
-                    <div className="absolute right-0 z-20 -mt-20 w-40 bg-[#232329] border border-gray-700 rounded shadow-lg py-1">
+                    <div className="absolute  md:right-64 -right-5  z-20 -mt-20 w-40 bg-[#232329] border border-gray-700 rounded shadow-lg py-1">
                       <button
                         className="block w-full text-left px-4 py-2 text-red-500 hover:bg-gray-800"
                         onClick={() => {
@@ -426,6 +468,81 @@ const OfficerDashboard = () => {
           </div>
         </div>
 
+        {historyOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 transition-opacity"
+            onClick={() => setHistoryOpen(false)}
+          />
+        )}
+        <div
+          className={`fixed top-0 left-0 h-full w-full max-w-md bg-[#18181b] shadow-2xl z-50 transform transition-transform duration-300 ${historyOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+        >
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-gray-100 flex items-center gap-2">
+                <svg className="w-6 h-6 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Task History
+              </h2>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-gray-400 rounded hover:bg-gray-800 p-2 transition"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {historyLoading ? (
+                <div className="text-gray-400 text-center py-10">Loading history...</div>
+              ) : historyError ? (
+                <div className="text-red-500 text-center">{historyError}</div>
+              ) : historyTasks.length === 0 ? (
+                <div className="text-gray-400 text-center py-10">No assigned tasks yet.</div>
+              ) : (
+                <ul className="space-y-5">
+                  {historyTasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className={`rounded-lg p-4 shadow border-l-4 ${task.status === "Completed"
+                        ? "border-green-500 bg-green-900/20"
+                        : task.status === "Completing"
+                          ? "border-blue-500 bg-blue-900/20"
+                          : "border-yellow-500 bg-yellow-900/20"
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold text-gray-100 space-x-4">
+                          To: <span className="text-blue-300">{task.user?.name || task.userId}</span>
+                          <span>({task.user?.email})</span>
+                          <span className="text-gray-400">[{task.user?.role}]</span>
+                        </span>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full font-bold ${task.status === "Completed"
+                            ? "bg-green-600 text-white"
+                            : task.status === "Completing"
+                              ? "bg-blue-600 text-white"
+                              : "bg-yellow-500 text-black"
+                            }`}
+                        >
+                          {task.status}
+                        </span>
+                      </div>
+                      <div className="text-gray-200 mb-1">{task.task_info}</div>
+                      <div className="text-xs text-gray-400">
+                        Assigned: {new Date(task.createdAt).toLocaleString()}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
         {/* Overlay */}
         {(sidebarOpen || assignSidebarOpen) && (
           <div
@@ -436,9 +553,38 @@ const OfficerDashboard = () => {
             }}
           />
         )}
+         <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-20 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg z-40 hover:bg-blue-700"
+          title="Open Chat"
+        >
+          💬
+        </button>
+        <ChatSidebar open={chatOpen} setOpen={setChatOpen} />
+        {chatOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 transition-opacity"
+            onClick={() => setChatOpen(false)}
+          />
+        )}
 
         {/* Main Content */}
-        <h1 className="text-3xl font-bold text-gray-100 mb-8">Officer Dashboard</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-100">Officer Dashboard</h1>
+          <button
+            onClick={() => {
+              setHistoryOpen(true);
+              fetchHistory();
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-gray-700 via-gray-900 to-black text-white shadow hover:from-blue-700 hover:to-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+            title="View Task History"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="hidden md:inline">History</span>
+          </button>
+        </div>
         {error && <div className="mb-4 text-red-500">{error}</div>}
         {loading ? (
           <div className="text-gray-400 text-center py-20">Loading...</div>
@@ -450,6 +596,7 @@ const OfficerDashboard = () => {
           </>
         )}
       </div>
+
     </div>
   );
 };

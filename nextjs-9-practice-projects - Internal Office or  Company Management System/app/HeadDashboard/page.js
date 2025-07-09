@@ -392,12 +392,15 @@
 
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { ChatSidebar } from "../ChatSidebar/page";
 
 const TABLE_HEADER_CLASSES = "px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider";
 const TABLE_CELL_CLASSES = "px-6 py-4 whitespace-nowrap text-sm text-gray-200";
 const TABLE_ROW_CLASSES = "hover:bg-gray-800 transition cursor-pointer";
 
+
 const Page = () => {
+  const [chatOpen, setChatOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [officers, setOfficers] = useState([]);
   const [error, setError] = useState("");
@@ -425,7 +428,13 @@ const Page = () => {
   const [assignSuccess, setAssignSuccess] = useState("");
   const assignTextRef = useRef(null);
 
-  const name = localStorage.getItem("name");
+  const [name, setName] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedName = localStorage.getItem("name");
+      setName(storedName || "");
+    }
+  }, []);
   // console.log("Stored name:", localStorage.getItem("name"));
   // At the top of your return, before <h1>...
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -615,11 +624,9 @@ const Page = () => {
     }
     setAddLoading(false);
   };
-
-  // --- Render Table ---
   const renderTable = (users, type) => (
-    <div className="bg-[#18181b] rounded-xl shadow border border-gray-800 mb-8 relative">
-      <table className="min-w-full divide-y divide-gray-700">
+    <div className="bg-[#18181b] rounded-xl shadow border border-gray-800 mb-8 overflow-auto">
+      <table className="min-w-full divide-y divide-gray-700 ">
         <thead>
           <tr>
             <th className={TABLE_HEADER_CLASSES}>Name</th>
@@ -627,23 +634,22 @@ const Page = () => {
             <th className={TABLE_HEADER_CLASSES}>Role</th>
             <th className={TABLE_HEADER_CLASSES}>Actions</th>
             <th className={TABLE_HEADER_CLASSES}>Assign Task</th>
-
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
           {users.length === 0 ? (
             <tr>
-              <td colSpan={4} className="text-center py-8 text-gray-500">
+              <td colSpan={5} className="text-center py-8 text-gray-500">
                 No {type}s found.
               </td>
             </tr>
           ) : (
             users.map((user) => (
               <tr key={user.id} className={TABLE_ROW_CLASSES}>
-                <td className={TABLE_CELL_CLASSES}>{user.name}</td>
-                <td className={TABLE_CELL_CLASSES}>{user.email}</td>
+                <td className={TABLE_CELL_CLASSES + " max-w-[120px] truncate"}>{user.name}</td>
+                <td className={TABLE_CELL_CLASSES + " max-w-[180px] truncate"}>{user.email}</td>
                 <td className={TABLE_CELL_CLASSES}>{type.charAt(0).toUpperCase() + type.slice(1)}</td>
-                <td className={TABLE_CELL_CLASSES + " relative"}>
+                <td className={TABLE_CELL_CLASSES + " "}>
                   <button
                     className="p-1 rounded hover:bg-gray-700"
                     onClick={() => toggleMenu(user.id)}
@@ -660,7 +666,7 @@ const Page = () => {
                     </svg>
                   </button>
                   {menuOpen[user.id] && (
-                    <div className="absolute -right-10 z-20 -mt-30 w-40 bg-[#232329] border border-gray-700 rounded shadow-lg py-1">
+                    <div className="absolute md:right-64 -right-5 z-20 -mt-30 w-40 bg-[#232329] border border-gray-700 rounded shadow-lg py-1 ">
                       {type === "employee" ? (
                         <button
                           className="block w-full text-left px-4 py-2 hover:bg-gray-800 text-gray-200"
@@ -693,7 +699,6 @@ const Page = () => {
                       </button>
                     </div>
                   )}
-
                 </td>
                 <td className={TABLE_CELL_CLASSES}>
                   <button
@@ -703,7 +708,6 @@ const Page = () => {
                     Assign Task
                   </button>
                 </td>
-
               </tr>
             ))
           )}
@@ -711,6 +715,9 @@ const Page = () => {
       </table>
     </div>
   );
+
+  // --- Render Table ---
+ 
 
   return (
     <div className="min-h-screen bg-[#151518] py-10 px-4">
@@ -934,10 +941,10 @@ const Page = () => {
                     <li
                       key={task.id}
                       className={`rounded-lg p-4 shadow border-l-4 ${task.status === "Completed"
-                          ? "border-green-500 bg-green-900/20"
-                          : task.status === "Completing"
-                            ? "border-blue-500 bg-blue-900/20"
-                            : "border-yellow-500 bg-yellow-900/20"
+                        ? "border-green-500 bg-green-900/20"
+                        : task.status === "Completing"
+                          ? "border-blue-500 bg-blue-900/20"
+                          : "border-yellow-500 bg-yellow-900/20"
                         }`}
                     >
                       <div className="flex justify-between items-center mb-1">
@@ -948,10 +955,10 @@ const Page = () => {
                         </span>
                         <span
                           className={`text-xs px-2 py-1 rounded-full font-bold ${task.status === "Completed"
-                              ? "bg-green-600 text-white"
-                              : task.status === "Completing"
-                                ? "bg-blue-600 text-white"
-                                : "bg-yellow-500 text-black"
+                            ? "bg-green-600 text-white"
+                            : task.status === "Completing"
+                              ? "bg-blue-600 text-white"
+                              : "bg-yellow-500 text-black"
                             }`}
                         >
                           {task.status}
@@ -969,6 +976,14 @@ const Page = () => {
           </div>
         </div>
 
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-20 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg z-40 hover:bg-blue-700"
+          title="Open Chat"
+        >
+          💬
+        </button>
+        <ChatSidebar open={chatOpen} setOpen={setChatOpen} />
         {/* Overlay for history sidebar */}
         {historyOpen && (
           <div
@@ -976,7 +991,12 @@ const Page = () => {
             onClick={() => setHistoryOpen(false)}
           />
         )}
-
+        {chatOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 transition-opacity"
+            onClick={() => (false)}
+          />
+        )}
         {/* Overlay */}
         {assignSidebarOpen && (
           <div

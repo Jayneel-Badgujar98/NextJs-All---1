@@ -30,11 +30,19 @@ export default function EmployeeTasksPage() {
   // Get logged-in user's email from cookies
   // const email = getCookie("email");
   // const email = req.cookies.get('email')?.value;
-
-  
-  // Fetch tasks for the logged-in user
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   useEffect(() => {
-    const email = localStorage.getItem("email") || "";
+    if (typeof window !== "undefined") {
+      const storedName = localStorage.getItem("name");
+      const email = localStorage.getItem("email");
+      setName(storedName || "");
+      setEmail(email || "");
+    }
+  }, []);
+
+
+  const fetchTasks = async () => {
     if (!email) {
       setError("No user email found in localstorage.");
       setLoading(false);
@@ -42,7 +50,7 @@ export default function EmployeeTasksPage() {
     }
     setLoading(true);
     // fetch(`/api/getTasksByEmail?email=${encodeURIComponent(email)}`)
-    fetch(`/api/getTasksByEmail`, { body : JSON.stringify({email}) , method: "POST", headers: { "Content-Type": "application/json" } })
+    fetch(`/api/getTasksByEmail`, { body: JSON.stringify({ email }), method: "POST", headers: { "Content-Type": "application/json" } })
       .then((res) => res.json())
       .then(data => {
         setTasks(data || []);
@@ -53,8 +61,15 @@ export default function EmployeeTasksPage() {
         setError("Failed to load tasks.");
         setLoading(false);
       });
-  }, []);
+  }
+  // Fetch tasks for the logged-in user
 
+  useEffect(() => {
+
+    if (email) {
+      fetchTasks()
+    }
+  }, [email]);
   // Handle status change
   const handleStatusChange = async (taskId, newStatus) => {
     setStatusUpdating((prev) => ({ ...prev, [taskId]: true }));
@@ -78,7 +93,7 @@ export default function EmployeeTasksPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-800 via-black to-gray-900 py-10 px-4">
-      <div className="max-w-3xl mx-auto bg-black/80 backdrop-blur-lg rounded-2xl p-8 shadow-lg border border-gray-700 overflow-auto h-[650px] whitespace-nowrap ">
+      <div className="max-w-3xl mx-auto bg-black/80 backdrop-blur-lg rounded-2xl p-8 shadow-lg border border-gray-700 overflow-auto h-[90vh] lg:h-[650px] whitespace-nowrap ">
         <h1 className="text-3xl font-bold text-white mb-8 text-center sticky top-0 z-10  backdrop-blur-lg ">
           My Tasks
         </h1>
@@ -104,8 +119,8 @@ export default function EmployeeTasksPage() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${task.sendedByRole === "Head"
-                        ? "bg-pink-600 text-white"
-                        : "bg-blue-600 text-white"
+                      ? "bg-pink-600 text-white"
+                      : "bg-blue-600 text-white"
                       }`}
                   >
                     From {task.sendedByRole}

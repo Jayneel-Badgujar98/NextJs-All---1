@@ -20,6 +20,6 @@ export async function POST(req) {
         return NextResponse.json(taskAssigned, { status: 200 })
     } catch (error) {
         console.error("Error Assigning task:", error);
-        return NextResponse.json({ error: "Failed to  assing task user" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to assing task user" }, { status: 500 });
     }
 }
